@@ -27,9 +27,11 @@ router.post('/explain', async (req, res) => {
   if (code.length > 6000) {
     return res.status(400).json({ message: 'Code is too long (max 6000 characters)' });
   }
-
-  try {
+try {
     console.log('Calling Groq, model:', process.env.GROQ_MODEL, 'key loaded:', Boolean(process.env.GROQ_API_KEY));
+    
+    // Add line numbers to the code
+    const numbered = code.split('\n').map((line, i) => `${i + 1}: ${line}`).join('\n');
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -41,16 +43,18 @@ router.post('/explain', async (req, res) => {
       body: JSON.stringify({
         model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { 
+            role: 'system', 
+            content: SYSTEM_PROMPT + ' Each line of the code starts with its line number and a colon. Use those numbers in the "lines" field.' 
+          },
           {
             role: 'user',
-            content: `Language: ${language || 'auto-detect'}\n\nExplain this code in JSON:\n\n${code}`,
+            content: `Language: ${language || 'auto-detect'}\n\nExplain this code in JSON:\n\n${numbered}`,
           },
         ],
         temperature: 0.2,
       }),
     });
-
     if (response.status === 429) {
       return res.status(429).json({ message: 'AI service is busy, try again in a minute' });
     }
